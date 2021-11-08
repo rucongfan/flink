@@ -476,21 +476,23 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 					"does not have Kerberos credentials or delegation tokens!");
 			}
 		}
-
+		// 部署前检查: jar包路径、配置路径、是否超出yarn资源限制
 		isReadyForDeployment(clusterSpecification);
 
 		// ------------------ Check if the specified queue exists --------------------
-
+		// 检查指定的yarn队列是否存在
 		checkYarnQueues(yarnClient);
 
 		// ------------------ Check if the YARN ClusterClient has the requested resources --------------
-
+		// 检查yarn是否有足够的资源
 		// Create application via yarnClient
+
+		// 获取app id
 		final YarnClientApplication yarnApplication = yarnClient.createApplication();
 		final GetNewApplicationResponse appResponse = yarnApplication.getNewApplicationResponse();
-
+		// 获取能提供资源的最大值
 		Resource maxRes = appResponse.getMaximumResourceCapability();
-
+		// 获取当前空闲的集群资源
 		final ClusterResourceDescription freeClusterMem;
 		try {
 			freeClusterMem = getCurrentFreeClusterResources(yarnClient);
@@ -498,9 +500,9 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 			failSessionDuringDeployment(yarnClient, yarnApplication);
 			throw new YarnDeploymentException("Could not retrieve information about free cluster resources.", e);
 		}
-
+		// rm scheduler可分配的最小值
 		final int yarnMinAllocationMB = yarnConfiguration.getInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 0);
-
+		// 获取最终有效的集群资源配置
 		final ClusterSpecification validClusterSpecification;
 		try {
 			validClusterSpecification = validateClusterResources(
@@ -514,7 +516,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		}
 
 		LOG.info("Cluster specification: {}", validClusterSpecification);
-
+		// 判断集群入口的执行模式：分离模式还是普通模式
 		final ClusterEntrypoint.ExecutionMode executionMode = detached ?
 				ClusterEntrypoint.ExecutionMode.DETACHED
 				: ClusterEntrypoint.ExecutionMode.NORMAL;
