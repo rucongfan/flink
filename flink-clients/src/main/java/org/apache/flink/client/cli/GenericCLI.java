@@ -86,6 +86,9 @@ public class GenericCLI implements CustomCommandLine {
 
 	@Override
 	public boolean isActive(CommandLine commandLine) {
+		// 1.判断flink-conf.yml中是否存在execution.target相关配置
+		// 2.判断组装的命令行是否由-e
+		// 3.判断组装的命令行是否由-t
 		return baseConfiguration.getOptional(DeploymentOptions.TARGET).isPresent()
 				|| commandLine.hasOption(executorOption.getOpt())
 				|| commandLine.hasOption(targetOption.getOpt());

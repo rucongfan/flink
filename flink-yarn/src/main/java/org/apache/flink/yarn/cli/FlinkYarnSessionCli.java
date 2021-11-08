@@ -294,6 +294,8 @@ public class FlinkYarnSessionCli extends AbstractCustomCommandLine {
 
 	@Override
 	public boolean isActive(CommandLine commandLine) {
+		// 通过-m指定了yarm-cluster || yarn有application或者指定了 || 执行器指定了yarn。也就是execution.target是yarn-pre-job或者yarn-session
+		// 则为active
 		final String jobManagerOption = commandLine.getOptionValue(addressOption.getOpt(), null);
 		final boolean yarnJobManager = ID.equals(jobManagerOption);
 		final boolean hasYarnAppId = commandLine.hasOption(applicationId.getOpt())

@@ -204,31 +204,37 @@ public class CliFrontend {
 	 */
 	protected void run(String[] args) throws Exception {
 		LOG.info("Running 'run' command.");
-
+		// 此方法先构造默认的配置项添加了-h -v参数,然后添加程序指定的配置
 		final Options commandOptions = CliFrontendParser.getRunCommandOptions();
+		// param: 默认配置项，程序参数，flag
+		// 对之前构造的命令行选项进行合并，然后解析程序参数中的-c -p之类的
 		final CommandLine commandLine = getCommandLine(commandOptions, args, true);
 
 		// evaluate help flag
+		// 查看如果命令行有--help则输出help信息
 		if (commandLine.hasOption(HELP_OPTION.getOpt())) {
 			CliFrontendParser.printHelpForRun(customCommandLines);
 			return;
 		}
-
+		// 验证并获取活跃的命令。此处是按当时添加的顺序进行遍历的
+		// 然后分别调用CustomCommandLine接口实现类的isActive()方法进行判断，包括GenericCLI是用于验证默认配置项哪个命令处于active状态
 		final CustomCommandLine activeCommandLine =
 				validateAndGetActiveCommandLine(checkNotNull(commandLine));
-
+		// 根据命令行构建programOption对象以及Jar相关信息
 		final ProgramOptions programOptions = ProgramOptions.create(commandLine);
 
 		final PackagedProgram program =
 				getPackagedProgram(programOptions);
-
+		// 获取用户的jar包和其他依赖
 		final List<URL> jobJars = program.getJobJarAndDependencies();
+		// 获取有效的配置
 		final Configuration effectiveConfiguration = getEffectiveConfiguration(
 				activeCommandLine, commandLine, programOptions, jobJars);
 
 		LOG.debug("Effective executor configuration: {}", effectiveConfiguration);
 
 		try {
+			// 根据构建的程序和有效配置执行程序
 			executeProgram(effectiveConfiguration, program);
 		} finally {
 			program.deleteExtractedLibraries();

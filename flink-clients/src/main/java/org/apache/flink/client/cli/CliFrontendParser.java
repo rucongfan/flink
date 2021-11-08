@@ -274,9 +274,14 @@ public class CliFrontendParser {
 	}
 
 	public static Options getRunCommandOptions() {
+		// 构建默认配置项，并添加了-h -v两个参数
 		Options options = buildGeneralOptions(new Options());
+		// 获取程序指定的配置，里面包括一些可直接识别的配置项，-j 指定jar， -c 指定class  -p 指定并行度
 		options = getProgramSpecificOptions(options);
+		// 添加用于指定savepoint路径的-s 选项
 		options.addOption(SAVEPOINT_PATH_OPTION);
+		// 添加-n 选项，用于指定允许跳过不能恢复的savepoint状态，如果你从你的程序中移除了一个算子(操作)
+		// 而该算子在触发savepoint的时候是程序的一部分则需要这么做。
 		return options.addOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION);
 	}
 

@@ -1693,7 +1693,7 @@ public class StreamExecutionEnvironment {
 	 */
 	public JobExecutionResult execute(String jobName) throws Exception {
 		Preconditions.checkNotNull(jobName, "Streaming Job name should not be null.");
-
+		// 获取streamGraph
 		return execute(getStreamGraph(jobName));
 	}
 
@@ -1796,7 +1796,7 @@ public class StreamExecutionEnvironment {
 	public JobClient executeAsync(StreamGraph streamGraph) throws Exception {
 		checkNotNull(streamGraph, "StreamGraph cannot be null.");
 		checkNotNull(configuration.get(DeploymentOptions.TARGET), "No execution.target specified in your configuration file.");
-
+		// 根据配置获取对应的执行器工厂，这里pre job模式获取的是YarnJobClusterExecutorFactory
 		final PipelineExecutorFactory executorFactory =
 			executorServiceLoader.getExecutorFactory(configuration);
 

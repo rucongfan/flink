@@ -59,13 +59,16 @@ public class AbstractJobClusterExecutor<ClusterID, ClientFactory extends Cluster
 
 	@Override
 	public CompletableFuture<JobClient> execute(@Nonnull final Pipeline pipeline, @Nonnull final Configuration configuration) throws Exception {
+		// 讲streamGraph转换成jobGraph
 		final JobGraph jobGraph = PipelineExecutorUtils.getJobGraph(pipeline, configuration);
 
+		// 获取集群描述器，此方法实际YarnClusterClientFactory.createClusterDescriptor.getClusterDescriptor方法其中创建了yarn客户端用于与yarn进行交互
 		try (final ClusterDescriptor<ClusterID> clusterDescriptor = clusterClientFactory.createClusterDescriptor(configuration)) {
+			// 根据配置创建一个执行配置访问器，底层实际调用的还是其构造方法
 			final ExecutionConfigAccessor configAccessor = ExecutionConfigAccessor.fromConfiguration(configuration);
-
+			// 根据配置创建集群指定配置
 			final ClusterSpecification clusterSpecification = clusterClientFactory.getClusterSpecification(configuration);
-
+			// 进行部署
 			final ClusterClientProvider<ClusterID> clusterClientProvider = clusterDescriptor
 					.deployJobCluster(clusterSpecification, jobGraph, configAccessor.getDetachedMode());
 			LOG.info("Job has been submitted with JobID " + jobGraph.getJobID());

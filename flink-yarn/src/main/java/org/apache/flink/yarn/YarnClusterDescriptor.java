@@ -268,17 +268,19 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 	}
 
 	private void isReadyForDeployment(ClusterSpecification clusterSpecification) throws Exception {
-
+		// 检查程序jar是否存在
 		if (this.flinkJarPath == null) {
 			throw new YarnDeploymentException("The Flink jar path is null");
 		}
+		// 检查配置对象是否存在
 		if (this.flinkConfiguration == null) {
 			throw new YarnDeploymentException("Flink configuration object has not been set");
 		}
 
 		// Check if we don't exceed YARN's maximum virtual cores.
+		// 检查是否超出yarn最大的虚拟 cpu核数
 		final int numYarnMaxVcores = yarnClusterInformationRetriever.getMaxVcores();
-
+		// 获取任务配置app master的cpu核数，并判断是否超出yarn最大核数
 		int configuredAmVcores = flinkConfiguration.getInteger(YarnConfigOptions.APP_MASTER_VCORES);
 		if (configuredAmVcores > numYarnMaxVcores) {
 			throw new IllegalConfigurationException(
@@ -286,9 +288,10 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 									" exceeds the maximum number of virtual cores %d available in the Yarn Cluster.",
 							configuredAmVcores, numYarnMaxVcores));
 		}
-
+		// 获取配置中container的cpu核数，如果不存在该配置则默认为每个TM的slot数
 		int configuredVcores = flinkConfiguration.getInteger(YarnConfigOptions.VCORES, clusterSpecification.getSlotsPerTaskManager());
 		// don't configure more than the maximum configured number of vcores
+		// 配置的container的cpu数如果超出yarn配置的最大cpu数则不进行配置，抛出异常
 		if (configuredVcores > numYarnMaxVcores) {
 			throw new IllegalConfigurationException(
 					String.format("The number of requested virtual cores per node %d" +
@@ -299,6 +302,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		}
 
 		// check if required Hadoop environment variables are set. If not, warn user
+		// 检查要求的hadoop环境变量是否设置，如果没有则提示用户
 		if (System.getenv("HADOOP_CONF_DIR") == null &&
 				System.getenv("YARN_CONF_DIR") == null) {
 			LOG.warn("Neither the HADOOP_CONF_DIR nor the YARN_CONF_DIR environment variable is set. " +
@@ -487,20 +491,21 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		// 检查yarn是否有足够的资源
 		// Create application via yarnClient
 
-		// 获取app id
+		// 通过yarn客户端创建applicatio
 		final YarnClientApplication yarnApplication = yarnClient.createApplication();
 		final GetNewApplicationResponse appResponse = yarnApplication.getNewApplicationResponse();
-		// 获取能提供资源的最大值
+		// 获取ResourceManager在集群中可分配资源的最大能力
 		Resource maxRes = appResponse.getMaximumResourceCapability();
-		// 获取当前空闲的集群资源
 		final ClusterResourceDescription freeClusterMem;
 		try {
+			// 获取当前空闲的集群资源
+			// 如果不在部署过程中失败则kill掉该application，并抛出异常
 			freeClusterMem = getCurrentFreeClusterResources(yarnClient);
 		} catch (YarnException | IOException e) {
 			failSessionDuringDeployment(yarnClient, yarnApplication);
 			throw new YarnDeploymentException("Could not retrieve information about free cluster resources.", e);
 		}
-		// rm scheduler可分配的最小值
+		// 获取yarn单个container最小分配的大小
 		final int yarnMinAllocationMB = yarnConfiguration.getInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 0);
 		// 获取最终有效的集群资源配置
 		final ClusterSpecification validClusterSpecification;
@@ -522,7 +527,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 				: ClusterEntrypoint.ExecutionMode.NORMAL;
 
 		flinkConfiguration.setString(ClusterEntrypoint.EXECUTION_MODE, executionMode.toString());
-
+		// 启动ApplicationMaster
 		ApplicationReport report = startAppMaster(
 				flinkConfiguration,
 				applicationName,
@@ -554,38 +559,43 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		int yarnMinAllocationMB,
 		Resource maximumResourceCapability,
 		ClusterResourceDescription freeClusterResources) throws YarnDeploymentException {
-
+		// 获取集群指定配置中的jobmanager内存
 		int jobManagerMemoryMb = clusterSpecification.getMasterMemoryMB();
+		// 获取集群指定配置中的taskManager内存
 		final int taskManagerMemoryMb = clusterSpecification.getTaskManagerMemoryMB();
-
+		// 判断组件请求的内存是否是yarn最小分配内存的整数倍，不是话则用最小分配内存的整数倍进行分配，多余的则不会被flink使用
+		// param: 组件的名字、程序指定的资源、yarn分配的最小资源
 		logIfComponentMemNotIntegerMultipleOfYarnMinAllocation("JobManager", jobManagerMemoryMb, yarnMinAllocationMB);
 		logIfComponentMemNotIntegerMultipleOfYarnMinAllocation("TaskManager", taskManagerMemoryMb, yarnMinAllocationMB);
 
 		// set the memory to minAllocationMB to do the next checks correctly
+		// 如果jobmanager申请的内存小于yarn最小分配内存则修正为最小分配内存，确保下次检查的正确性
 		if (jobManagerMemoryMb < yarnMinAllocationMB) {
 			jobManagerMemoryMb =  yarnMinAllocationMB;
 		}
-
+		// 如果jobmanager申请内存超出yarn最大可分配内存则抛出异常
 		final String note = "Please check the 'yarn.scheduler.maximum-allocation-mb' and the 'yarn.nodemanager.resource.memory-mb' configuration values\n";
 		if (jobManagerMemoryMb > maximumResourceCapability.getMemory()) {
 			throw new YarnDeploymentException("The cluster does not have the requested resources for the JobManager available!\n"
 					+ "Maximum Memory: " + maximumResourceCapability.getMemory() + "MB Requested: " + jobManagerMemoryMb + "MB. " + note);
 		}
-
+		// 同样的如果taskManager申请的内存超出yarn最大可分配内存则抛出异常
 		if (taskManagerMemoryMb > maximumResourceCapability.getMemory()) {
 			throw new YarnDeploymentException("The cluster does not have the requested resources for the TaskManagers available!\n"
 					+ "Maximum Memory: " + maximumResourceCapability.getMemory() + " Requested: " + taskManagerMemoryMb + "MB. " + note);
 		}
-
+		// flink客户端尝试分配yarn session，但因为集群当前资源不可用可能不是所有的taskmanager都是一开始就进行连接的。分配可能比往常更耗时因为
+		// flink客户端需要等待直到资源变得可用
 		final String noteRsc = "\nThe Flink YARN client will try to allocate the YARN session, but maybe not all TaskManagers are " +
 				"connecting from the beginning because the resources are currently not available in the cluster. " +
 				"The allocation might take more time than usual because the Flink YARN client needs to wait until " +
 				"the resources become available.";
-
+		// 如果申请的taskManager内存超出之前计算的最大空闲内存则WARN
 		if (taskManagerMemoryMb > freeClusterResources.containerLimit) {
 			LOG.warn("The requested amount of memory for the TaskManagers (" + taskManagerMemoryMb + "MB) is more than "
 					+ "the largest possible YARN container: " + freeClusterResources.containerLimit + noteRsc);
 		}
+		// jobmanager同上
 		if (jobManagerMemoryMb > freeClusterResources.containerLimit) {
 			LOG.warn("The requested amount of memory for the JobManager (" + jobManagerMemoryMb + "MB) is more than "
 					+ "the largest possible YARN container: " + freeClusterResources.containerLimit + noteRsc);
@@ -655,11 +665,11 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 			ClusterSpecification clusterSpecification) throws Exception {
 
 		// ------------------ Initialize the file systems -------------------------
-
+		// 初始化hadoop文件系统
 		org.apache.flink.core.fs.FileSystem.initialize(
 				configuration,
 				PluginUtils.createPluginManagerFromRootFolder(configuration));
-
+		// 根据配置创建hadoop file system
 		final FileSystem fs = FileSystem.get(yarnConfiguration);
 
 		// hard coded check for the GoogleHDFS client because its not overriding the getScheme() method.
@@ -669,11 +679,11 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 					+ "specified Hadoop configuration path is wrong and the system is using the default Hadoop configuration values."
 					+ "The Flink YARN client needs to store its files in a distributed file system");
 		}
-
+		// 获取yarn应用提交的上下文
 		ApplicationSubmissionContext appContext = yarnApplication.getApplicationSubmissionContext();
-
+		// 获取程序待上传路径
 		final List<Path> providedLibDirs = getRemoteSharedPaths(configuration);
-
+		// 创建yarn应用上传器
 		final YarnApplicationFileUploader fileUploader = YarnApplicationFileUploader.from(
 			fs,
 			fs.getHomeDirectory(),
@@ -1114,9 +1124,11 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 
 		for (int i = 0; i < nodes.size(); i++) {
 			NodeReport rep = nodes.get(i);
+			// 计算空闲的内存 最大内存-已使用内存
 			int free = rep.getCapability().getMemory() - (rep.getUsed() != null ? rep.getUsed().getMemory() : 0);
 			nodeManagersFree[i] = free;
 			totalFreeMemory += free;
+			// 此处containerLimit就是节点最大空闲内存，可能用于后续计算最大container数
 			if (free > containerLimit) {
 				containerLimit = free;
 			}

@@ -57,6 +57,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * This class encapsulates represents a program, packaged in a jar file. It supplies
  * functionality to extract nested libraries, search for the program entry point, and extract
  * a program plan.
+ * PackagedProgram 这个类封装了一个打包进jar文件的程序，它支持提取嵌套库，寻找程序入口和提取程序计划的功能
  */
 public class PackagedProgram {
 
@@ -285,6 +286,7 @@ public class PackagedProgram {
 		}
 
 		try {
+			// 调用用户main方法
 			mainMethod.invoke(null, (Object) args);
 		} catch (IllegalArgumentException e) {
 			throw new ProgramInvocationException("Could not invoke the main method, arguments are not matching.", e);

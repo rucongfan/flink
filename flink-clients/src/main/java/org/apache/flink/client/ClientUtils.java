@@ -123,14 +123,18 @@ public enum ClientUtils {
 			PackagedProgram program,
 			boolean enforceSingleJobExecution,
 			boolean suppressSysout) throws ProgramInvocationException {
+
 		checkNotNull(executorServiceLoader);
+		// 获取用户代码类加载器
 		final ClassLoader userCodeClassLoader = program.getUserCodeClassLoader();
 		final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
 		try {
+			// 将用户代码类加载器设置到当前线程
 			Thread.currentThread().setContextClassLoader(userCodeClassLoader);
 
 			LOG.info("Starting program (detached: {})", !configuration.getBoolean(DeploymentOptions.ATTACHED));
 
+			//配置执行环境，用户代码里的streamExecutionEnvironment就会拿到这些环境信息
 			ContextEnvironment.setAsContext(
 				executorServiceLoader,
 				configuration,
@@ -146,6 +150,7 @@ public enum ClientUtils {
 				suppressSysout);
 
 			try {
+				// 然后通过反射，类加载器和类名获取到该类的main方法然后进行调用用户main方法
 				program.invokeInteractiveModeForExecution();
 			} finally {
 				ContextEnvironment.unsetAsContext();
