@@ -42,7 +42,7 @@ public class MemoryBackwardsCompatibilityUtils {
 	public MemoryBackwardsCompatibilityUtils(LegacyMemoryOptions legacyMemoryOptions) {
 		this.legacyMemoryOptions = legacyMemoryOptions;
 	}
-
+	// 从给的配置中获取指定key的配置，有则直接返回，无则默认使用task manager堆大小进行赋值
 	public Configuration getConfWithLegacyHeapSizeMappedToNewConfigOption(
 		Configuration configuration,
 		ConfigOption<MemorySize> configOption) {

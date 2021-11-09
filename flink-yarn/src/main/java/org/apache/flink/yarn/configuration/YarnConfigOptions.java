@@ -248,7 +248,9 @@ public class YarnConfigOptions {
 							"When this is true Flink will ship the keytab file configured via " +
 									SecurityOptions.KERBEROS_LOGIN_KEYTAB.key() +
 									" as a localized YARN resource.");
-
+	// kerberos keytab文件将要本地化的路径，(非nodeManager的路径)，如果yarn.security.kerberos.ship-local-keytab设置为true
+	// flink将keytab文件作为yarn本地资源进行发送，这种情况下这个路径是相对于本地resource目录的.如果设置为false flink它自己将尝试直接定位
+	// keytab文件的路径
 	public static final ConfigOption<String> LOCALIZED_KEYTAB_PATH =
 			key("yarn.security.kerberos.localized-keytab-path")
 					.stringType()

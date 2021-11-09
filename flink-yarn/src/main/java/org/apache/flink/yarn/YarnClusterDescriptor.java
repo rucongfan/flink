@@ -683,7 +683,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		ApplicationSubmissionContext appContext = yarnApplication.getApplicationSubmissionContext();
 		// 获取程序待上传路径
 		final List<Path> providedLibDirs = getRemoteSharedPaths(configuration);
-		// 创建yarn应用上传器
+		// 创建yarn应用上传器：fs、待上传的hdfs路径
 		final YarnApplicationFileUploader fileUploader = YarnApplicationFileUploader.from(
 			fs,
 			fs.getHomeDirectory(),
@@ -692,21 +692,23 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 			getFileReplication());
 
 		// The files need to be shipped and added to classpath.
+		// 遍历添加待上传和添加到classPath的文件
 		Set<File> systemShipFiles = new HashSet<>(shipFiles.size());
 		for (File file : shipFiles) {
 			systemShipFiles.add(file.getAbsoluteFile());
 		}
-
+		// 获取flink/conf/log4j.properties文件路径并添加进待上传和加入classPath的列表中
 		final String logConfigFilePath = configuration.getString(YarnConfigOptionsInternal.APPLICATION_LOG_CONFIG_FILE);
 		if (logConfigFilePath != null) {
 			systemShipFiles.add(new File(logConfigFilePath));
 		}
 
 		// Set-up ApplicationSubmissionContext for the application
-
+		// 获取yarn applicationId
 		final ApplicationId appId = appContext.getApplicationId();
 
 		// ------------------ Add Zookeeper namespace to local flinkConfiguraton ------
+		// 获取zk namespace,由于未指定则为默认值
 		String zkNamespace = getZookeeperNamespace();
 		// no user specified cli argument for namespace?
 		if (zkNamespace == null || zkNamespace.isEmpty()) {
@@ -716,9 +718,10 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		}
 
 		configuration.setString(HighAvailabilityOptions.HA_CLUSTER_ID, zkNamespace);
-
+		// 判断是否为高可用模式
 		if (HighAvailabilityMode.isHighAvailabilityModeActivated(configuration)) {
 			// activate re-execution of failed applications
+			// 激活失败任务重新执行，获取yarn.application-attempts无则默认用yarn.resourcemanager.am.max-attempts=2
 			appContext.setMaxAppAttempts(
 					configuration.getInteger(
 							YarnConfigOptions.APPLICATION_ATTEMPTS.key(),
@@ -727,6 +730,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 			activateHighAvailabilitySupport(appContext);
 		} else {
 			// set number of application retries to 1 in the default case
+			// 否则设置重试次数为1
 			appContext.setMaxAppAttempts(
 					configuration.getInteger(
 							YarnConfigOptions.APPLICATION_ATTEMPTS.key(),
@@ -734,6 +738,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		}
 
 		final Set<Path> userJarFiles = new HashSet<>();
+		// 添加用户jar包
 		if (jobGraph != null) {
 			userJarFiles.addAll(jobGraph.getUserJars().stream().map(f -> f.toUri()).map(Path::new).collect(Collectors.toSet()));
 		}
@@ -744,6 +749,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		}
 
 		// only for per job mode
+		// 仅用于pre job模式
 		if (jobGraph != null) {
 			for (Map.Entry<String, DistributedCache.DistributedCacheEntry> entry : jobGraph.getUserArtifacts().entrySet()) {
 				// only upload local files
@@ -757,13 +763,14 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 
 			jobGraph.writeUserArtifactEntriesToConfiguration();
 		}
-
+		// 添加lib目录到待上传文件list
 		if (providedLibDirs == null || providedLibDirs.isEmpty()) {
 			addLibFoldersToShipFiles(systemShipFiles);
 		}
 
 		// Register all files in provided lib dirs as local resources with public visibility
 		// and upload the remaining dependencies as local resources with APPLICATION visibility.
+		// 将提供的lib目录注册到本地，这其实是yarn的一个动作。分配任务的节点需要拉取代码到本地执行
 		final List<String> systemClassPaths = fileUploader.registerProvidedLocalResources();
 		final List<String> uploadedDependencies = fileUploader.registerMultipleLocalResources(
 			systemShipFiles.stream().map(e -> new Path(e.toURI())).collect(Collectors.toSet()),
@@ -772,6 +779,8 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 
 		// upload and register ship-only files
 		// Plugin files only need to be shipped and should not be added to classpath.
+		// 上传并注册仅传送的文件
+		// 插件文件仅需要传送不需要添加到classpath
 		if (providedLibDirs == null || providedLibDirs.isEmpty()) {
 			Set<File> shipOnlyFiles = new HashSet<>();
 			addPluginsFoldersToShipFiles(shipOnlyFiles);
@@ -781,6 +790,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		}
 
 		// Upload and register user jars
+		// 上传并注册用户jar包
 		final List<String> userClassPaths = fileUploader.registerMultipleLocalResources(
 			userJarFiles,
 			userJarInclusion == YarnConfigOptions.UserJarInclusion.DISABLED ?
@@ -791,6 +801,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		}
 
 		// normalize classpath by sorting
+		// 通过排序规范化classpath
 		Collections.sort(systemClassPaths);
 		Collections.sort(userClassPaths);
 
@@ -806,14 +817,17 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		}
 
 		// Setup jar for ApplicationMaster
+		// 为AM设置jar，上传flink-dist.jar
 		final YarnLocalResourceDescriptor localResourceDescFlinkJar = fileUploader.uploadFlinkDist(flinkJarPath);
 		classPathBuilder.append(localResourceDescFlinkJar.getResourceKey()).append(File.pathSeparator);
 
 		// write job graph to tmp file and add it to local resource
 		// TODO: server use user main method to generate job graph
+		// 在启动应用的时候写job graph到/tmp下的临时文件
 		if (jobGraph != null) {
 			File tmpJobGraphFile = null;
 			try {
+				// 临时文件的名字为appId
 				tmpJobGraphFile = File.createTempFile(appId.toString(), null);
 				try (FileOutputStream output = new FileOutputStream(tmpJobGraphFile);
 					ObjectOutputStream obOutput = new ObjectOutputStream(output)) {
@@ -842,8 +856,10 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 
 		// Upload the flink configuration
 		// write out configuration file
+		// 上传flink配置文件
 		File tmpConfigurationFile = null;
 		try {
+			// 临时文件为appId-flink-conf.yaml
 			tmpConfigurationFile = File.createTempFile(appId + "-flink-conf.yaml", null);
 			BootstrapTools.writeConfiguration(configuration, tmpConfigurationFile);
 
@@ -860,7 +876,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 				LOG.warn("Fail to delete temporary file {}.", tmpConfigurationFile.toPath());
 			}
 		}
-
+		// 将用户jar也添加进classPathBuilder
 		if (userJarInclusion == YarnConfigOptions.UserJarInclusion.LAST) {
 			for (String userClassPath : userClassPaths) {
 				classPathBuilder.append(userClassPath).append(File.pathSeparator);
@@ -871,9 +887,13 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		//In Integration test setup, the Yarn containers created by YarnMiniCluster does not have the Yarn site XML
 		//and KRB5 configuration files. We are adding these files as container local resources for the container
 		//applications (JM/TMs) to have proper secure cluster setup
+		// 支持yarn安全集成测试场景
+		// 在集成测试设置中，通过YarnMiniCluster创建的Yarn Container没有Yarn site XML和KRB5配置文件. 我们将为JM TM的container而把这些文件作为本地资源添加
+		// 以便有适当的安全集群设置
 		Path remoteKrb5Path = null;
 		Path remoteYarnSiteXmlPath = null;
 		boolean hasKrb5 = false;
+		// 判断如果是测试则分别判断yarn-site.xml和krb5配置文件是否存在并上传至远端
 		if (System.getenv("IN_TESTS") != null) {
 			File f = new File(System.getenv("YARN_CONF_DIR"), Utils.YARN_SITE_FILE_NAME);
 			LOG.info("Adding Yarn configuration {} to the AM container local resource bucket", f.getAbsolutePath());
@@ -899,14 +919,17 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 				hasKrb5 = true;
 			}
 		}
-
+		// 进行kerberos权限认证
 		Path remotePathKeytab = null;
 		String localizedKeytabPath = null;
 		String keytab = configuration.getString(SecurityOptions.KERBEROS_LOGIN_KEYTAB);
 		if (keytab != null) {
+			// 如果该配置为true，flink将会传送通过security.kerberos.login.keytab配置的keytab文件作为本地化的yarn资源
 			boolean	localizeKeytab = flinkConfiguration.getBoolean(YarnConfigOptions.SHIP_LOCAL_KEYTAB);
+			// 获取kerberos keytab文件将要本地化的路径(不是nodeManager节点)
 			localizedKeytabPath = flinkConfiguration.getString(YarnConfigOptions.LOCALIZED_KEYTAB_PATH);
 			if (localizeKeytab) {
+				// 如果是true这个keytab文件的路径是相对于本地resource目录的
 				// Localize the keytab to YARN containers via local resource.
 				LOG.info("Adding keytab {} to the AM container local resource bucket", keytab);
 				remotePathKeytab = fileUploader.registerSingleLocalResource(
@@ -916,30 +939,34 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 					false,
 					false).getPath();
 			} else {
+				// false 则自己定位keytab file的路径
 				// // Assume Keytab is pre-installed in the container.
 				localizedKeytabPath = flinkConfiguration.getString(YarnConfigOptions.LOCALIZED_KEYTAB_PATH);
 			}
 		}
-
+		// 配置JobManager JVM进程的大小，这包括Flink总内存、JVM metaspace、JVM Overhead
 		final JobManagerProcessSpec processSpec = JobManagerProcessUtils.processSpecFromConfigWithNewOptionToInterpretLegacyHeap(
 			flinkConfiguration,
 			JobManagerOptions.TOTAL_PROCESS_MEMORY);
+		// 通过配置设置AM container的启动参数比如jvmmem,jvmopts
 		final ContainerLaunchContext amContainer = setupApplicationMasterContainer(
 				yarnClusterEntrypoint,
 				hasKrb5,
 				processSpec);
 
 		// setup security tokens
+		// 给AM container添加token
 		if (UserGroupInformation.isSecurityEnabled()) {
 			// set HDFS delegation tokens when security is enabled
 			LOG.info("Adding delegation token to the AM container.");
 			Utils.setTokensFor(amContainer, fileUploader.getRemotePaths(), yarnConfiguration);
 		}
-
+		// 给Application Master设置配置资源
 		amContainer.setLocalResources(fileUploader.getRegisteredLocalResources());
 		fileUploader.close();
 
 		// Setup CLASSPATH and environment variables for ApplicationMaster
+		// 创建用于存储AM环境信息的map，环境变量，类路径
 		final Map<String, String> appMasterEnv = new HashMap<>();
 		// set user specified app master environment variables
 		appMasterEnv.putAll(
@@ -977,7 +1004,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 
 		// set classpath from YARN configuration
 		Utils.setupYarnClassPath(yarnConfiguration, appMasterEnv);
-
+		// 将上面封装的环境信息 设置进AM container
 		amContainer.setEnvironment(appMasterEnv);
 
 		// Set up resource type requirements for ApplicationMaster
@@ -1011,6 +1038,7 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		Thread deploymentFailureHook = new DeploymentFailureHook(yarnApplication, fileUploader.getApplicationDir());
 		Runtime.getRuntime().addShutdownHook(deploymentFailureHook);
 		LOG.info("Submitting application master " + appId);
+		// 提交应用
 		yarnClient.submitApplication(appContext);
 
 		LOG.info("Waiting for the cluster to be allocated");
