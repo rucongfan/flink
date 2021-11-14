@@ -159,16 +159,21 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
 	}
 
 	public void startCluster() throws ClusterEntrypointException {
+		// starting ClusterEntrypoint
 		LOG.info("Starting {}.", getClass().getSimpleName());
 
 		try {
+			// 如果配置了则用Halt替换Exit
 			replaceGracefulExitWithHaltIfConfigured(configuration);
+			// 从root目录注册PluginManager
 			PluginManager pluginManager = PluginUtils.createPluginManagerFromRootFolder(configuration);
+			// 配置文件系统
 			configureFileSystems(configuration, pluginManager);
-
+			// 安装Security相关的上下文
 			SecurityContext securityContext = installSecurityContext(configuration);
 
 			securityContext.runSecured((Callable<Void>) () -> {
+				// 启动集群
 				runCluster(configuration, pluginManager);
 
 				return null;
@@ -206,16 +211,17 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
 	}
 
 	private void runCluster(Configuration configuration, PluginManager pluginManager) throws Exception {
+		// 加锁
 		synchronized (lock) {
-
+			// 初始化服务。akka rpc相关
 			initializeServices(configuration, pluginManager);
 
 			// write host information into configuration
 			configuration.setString(JobManagerOptions.ADDRESS, commonRpcService.getAddress());
 			configuration.setInteger(JobManagerOptions.PORT, commonRpcService.getPort());
-
+			// 获取创建Dispatcher,ResourceManager组件的工厂实例
 			final DispatcherResourceManagerComponentFactory dispatcherResourceManagerComponentFactory = createDispatcherResourceManagerComponentFactory(configuration);
-
+			// 创建和启动 JobManager里的组件，Dispatcher,ResourceManager,JobMaster
 			clusterComponent = dispatcherResourceManagerComponentFactory.create(
 				configuration,
 				ioExecutor,
@@ -514,9 +520,10 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
 	// --------------------------------------------------
 
 	public static void runClusterEntrypoint(ClusterEntrypoint clusterEntrypoint) {
-
+		// 这里获取的就是不含包名的类名ClusterEntrypoint
 		final String clusterEntrypointName = clusterEntrypoint.getClass().getSimpleName();
 		try {
+			// 启动集群
 			clusterEntrypoint.startCluster();
 		} catch (ClusterEntrypointException e) {
 			LOG.error(String.format("Could not start cluster entrypoint %s.", clusterEntrypointName), e);
@@ -525,10 +532,11 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
 
 		clusterEntrypoint.getTerminationFuture().whenComplete((applicationStatus, throwable) -> {
 			final int returnCode;
-
+			// 如果异常类不为null则将返回码设置为异常退出的code
 			if (throwable != null) {
 				returnCode = RUNTIME_FAILURE_RETURN_CODE;
 			} else {
+				// 否则返回码为正常执行完退出的code
 				returnCode = applicationStatus.processExitCode();
 			}
 

@@ -192,21 +192,24 @@ public class YarnResourceManager extends ActiveResourceManager<YarnWorkerNode>
 			WorkerSpecContainerResourceAdapter.MatchingStrategy.MATCH_VCORE :
 			WorkerSpecContainerResourceAdapter.MatchingStrategy.IGNORE_VCORE;
 	}
-
+	// 创建并启动Yarn的ResourceManager
 	protected AMRMClientAsync<AMRMClient.ContainerRequest> createAndStartResourceManagerClient(
 			YarnConfiguration yarnConfiguration,
 			int yarnHeartbeatIntervalMillis,
 			@Nullable String webInterfaceUrl) throws Exception {
+		// 创建ResourceManager
 		AMRMClientAsync<AMRMClient.ContainerRequest> resourceManagerClient = AMRMClientAsync.createAMRMClientAsync(
 			yarnHeartbeatIntervalMillis,
 			this);
-
+		// 初始化yarn相关的配置
 		resourceManagerClient.init(yarnConfiguration);
+		// 启动
 		resourceManagerClient.start();
 
 		//TODO: change akka address to tcp host and port, the getAddress() interface should return a standard tcp address
+		// 将akka的地址换成tcp的host和port，getAddress()方法会返回一个标准的tcp地址
 		Tuple2<String, Integer> hostPort = parseHostPort(getAddress());
-
+		// 抽出端口号
 		final int restPort;
 
 		if (webInterfaceUrl != null) {
@@ -220,10 +223,13 @@ public class YarnResourceManager extends ActiveResourceManager<YarnWorkerNode>
 		} else {
 			restPort = -1;
 		}
-
+		// 注册ApplicationMaster
+		// param: host,port,url
 		final RegisterApplicationMasterResponse registerApplicationMasterResponse =
 			resourceManagerClient.registerApplicationMaster(hostPort.f0, restPort, webInterfaceUrl);
+		// 获取container
 		getContainersFromPreviousAttempts(registerApplicationMasterResponse);
+		// 更新匹配策略
 		updateMatchingStrategy(registerApplicationMasterResponse);
 
 		return resourceManagerClient;
@@ -274,6 +280,7 @@ public class YarnResourceManager extends ActiveResourceManager<YarnWorkerNode>
 	@Override
 	protected void initialize() throws ResourceManagerException {
 		try {
+			// 创建并启动ResourceManager客户端
 			resourceManagerClient = createAndStartResourceManagerClient(
 				yarnConfig,
 				yarnHeartbeatIntervalMillis,
@@ -281,7 +288,7 @@ public class YarnResourceManager extends ActiveResourceManager<YarnWorkerNode>
 		} catch (Exception e) {
 			throw new ResourceManagerException("Could not start resource manager client.", e);
 		}
-
+		// 创建和启动NodeManager客户端
 		nodeManagerClient = createAndStartNodeManagerClient(yarnConfig);
 	}
 

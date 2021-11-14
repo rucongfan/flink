@@ -311,8 +311,9 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	 */
 	public CompletableFuture<Acknowledge> start(final JobMasterId newJobMasterId) throws Exception {
 		// make sure we receive RPC and async calls
+		// 为了确保我们接收rpc服务和异步调用这里再次不直接调用start而是在内部再调用
 		start();
-
+		// 异步不阻塞RPC调用
 		return callAsyncWithoutFencing(() -> startJobExecution(newJobMasterId), RpcUtils.INF_TIMEOUT);
 	}
 
@@ -740,7 +741,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	//-- job starting and stopping  -----------------------------------------------------------------
 
 	private Acknowledge startJobExecution(JobMasterId newJobMasterId) throws Exception {
-
+		// 验证是否是在主进程中
 		validateRunsInMainThread();
 
 		checkNotNull(newJobMasterId, "The new JobMasterId must not be null.");
@@ -750,19 +751,20 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 
 			return Acknowledge.get();
 		}
-
+		// 设置新的阻塞token
 		setNewFencingToken(newJobMasterId);
-
+		// 真正启动JobMaster服务
 		startJobMasterServices();
 
 		log.info("Starting execution of job {} ({}) under job master id {}.", jobGraph.getName(), jobGraph.getJobID(), newJobMasterId);
-
+		// 重置并启动调度器
 		resetAndStartScheduler();
 
 		return Acknowledge.get();
 	}
 
 	private void startJobMasterServices() throws Exception {
+		// 启动JobMaster的心跳服务
 		startHeartbeatServices();
 
 		// start the slot pool make sure the slot pool now accepts messages for this leader
@@ -839,12 +841,13 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	private void startHeartbeatServices() {
+		// 创建TaskManager的心跳管理者
 		taskManagerHeartbeatManager = heartbeatServices.createHeartbeatManagerSender(
 			resourceId,
 			new TaskManagerHeartbeatListener(),
 			getMainThreadExecutor(),
 			log);
-
+		// 创建ResourceManager心跳管理者
 		resourceManagerHeartbeatManager = heartbeatServices.createHeartbeatManager(
 			resourceId,
 			new ResourceManagerHeartbeatListener(),

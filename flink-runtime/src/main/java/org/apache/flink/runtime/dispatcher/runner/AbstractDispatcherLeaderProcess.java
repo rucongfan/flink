@@ -99,6 +99,7 @@ public abstract class AbstractDispatcherLeaderProcess implements DispatcherLeade
 
 	private void startInternal() {
 		log.info("Start {}.", getClass().getSimpleName());
+		// 将app状态设置为running
 		state = State.RUNNING;
 		onStart();
 	}

@@ -27,6 +27,7 @@ import java.util.Collections;
 
 /**
  * Utility functions for the plugin mechanism.
+ * plugin机制的公共方法
  */
 public final class PluginUtils {
 

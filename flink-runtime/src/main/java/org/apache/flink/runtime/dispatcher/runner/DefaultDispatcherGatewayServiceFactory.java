@@ -57,12 +57,13 @@ class DefaultDispatcherGatewayServiceFactory implements AbstractDispatcherLeader
 			DispatcherId fencingToken,
 			Collection<JobGraph> recoveredJobs,
 			JobGraphWriter jobGraphWriter) {
-
+		// 创建DispatcherBootstrap此类用于在初始化dispatcher的时候提交jobgraph
 		final DispatcherBootstrap bootstrap =
 				new DefaultDispatcherBootstrap(recoveredJobs);
 
 		final Dispatcher dispatcher;
 		try {
+			// 创建dispatcher
 			dispatcher = dispatcherFactory.createDispatcher(
 				rpcService,
 				fencingToken,
@@ -71,7 +72,7 @@ class DefaultDispatcherGatewayServiceFactory implements AbstractDispatcherLeader
 		} catch (Exception e) {
 			throw new FlinkRuntimeException("Could not create the Dispatcher rpc endpoint.", e);
 		}
-
+		// 启动dispatcher,通过akka通信最终调用的是Dispatcher.onStart()
 		dispatcher.start();
 
 		return DefaultDispatcherGatewayService.from(dispatcher);

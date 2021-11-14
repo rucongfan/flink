@@ -303,6 +303,8 @@ public abstract class FileSystem {
 	 *
 	 * @param config the configuration from where to fetch the parameter.
 	 * @param pluginManager optional plugin manager that is used to initialized filesystems provided as plugins.
+	 *
+	 * 初始化共享文件系统的设置
 	 */
 	public static void initialize(
 		Configuration config,

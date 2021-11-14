@@ -208,6 +208,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 	@Override
 	public void onStart() throws Exception {
 		try {
+			// 启动ResourceManager服务
 			startResourceManagerServices();
 		} catch (Exception e) {
 			final ResourceManagerException exception = new ResourceManagerException(String.format("Could not start the ResourceManager %s", getAddress()), e);
@@ -218,10 +219,13 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 
 	private void startResourceManagerServices() throws Exception {
 		try {
+			// 获取resourceManager的leader选举服务
 			leaderElectionService = highAvailabilityServices.getResourceManagerLeaderElectionService();
-
+			// 初始化,yarn模式实际进入的是YarnResourceManager.initialize()
+			// 此方法主要是创建比启动Yarn的ResourceManager客户端和NodeManager客户端
 			initialize();
-
+			// 启动resourceManager leader选举服务，最后会进入对应组件的grantLeadership方法。
+			// 此方法最后会进入ResourceManager.grantLeadership()
 			leaderElectionService.start(this);
 			jobLeaderIdService.start(new JobLeaderIdActionsImpl());
 
@@ -957,6 +961,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 	 */
 	@Override
 	public void grantLeadership(final UUID newLeaderSessionID) {
+		// 尝试接受leadership
 		final CompletableFuture<Boolean> acceptLeadershipFuture = clearStateFuture
 			.thenComposeAsync((ignored) -> tryAcceptLeadership(newLeaderSessionID), getUnfencedMainThreadExecutor());
 
@@ -964,6 +969,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 			(acceptLeadership) -> {
 				if (acceptLeadership) {
 					// confirming the leader session ID might be blocking,
+					// 确认leader的session id可能会阻塞
 					leaderElectionService.confirmLeadership(newLeaderSessionID, getAddress());
 				}
 			},
@@ -989,7 +995,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 			}
 
 			setFencingToken(newResourceManagerId);
-
+			// 在leader上启动服务(心跳)
 			startServicesOnLeadership();
 
 			return prepareLeadershipAsync().thenApply(ignored -> true);
@@ -999,8 +1005,9 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 	}
 
 	protected void startServicesOnLeadership() {
+		// 启动心跳（jobManager,taskManager）
 		startHeartbeatServices();
-
+		// 启动slotManager
 		slotManager.start(getFencingToken(), getMainThreadExecutor(), new ResourceActionsImpl());
 	}
 

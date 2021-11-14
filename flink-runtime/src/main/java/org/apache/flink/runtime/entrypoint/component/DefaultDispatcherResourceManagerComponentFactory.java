@@ -163,7 +163,7 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 			webMonitorEndpoint.start();
 
 			final String hostname = RpcUtils.getHostname(rpcService);
-
+			// 创建resourceManager
 			resourceManager = resourceManagerFactory.createResourceManager(
 				configuration,
 				ResourceID.generate(),
@@ -191,6 +191,9 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 				metricRegistry.getMetricQueryServiceGatewayRpcAddress());
 
 			log.debug("Starting Dispatcher.");
+			// 创建并启动dispatcher,Dispatcher会启动JobMaster
+			// 此方法最终进入了DispatcherRunnerLeaderElectionLifecycleManager的构造方法，其中有启动dispatcher leader选举服务
+			// 在创建Dispatcher的时候创建了JobManager，而JobMaster是JobManager的一部分
 			dispatcherRunner = dispatcherRunnerFactory.createDispatcherRunner(
 				highAvailabilityServices.getDispatcherLeaderElectionService(),
 				fatalErrorHandler,
@@ -200,6 +203,7 @@ public class DefaultDispatcherResourceManagerComponentFactory implements Dispatc
 				partialDispatcherServices);
 
 			log.debug("Starting ResourceManager.");
+			// 启动ResourceManager
 			resourceManager.start();
 
 			resourceManagerRetrievalService.start(resourceManagerGatewayRetriever);

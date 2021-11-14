@@ -33,7 +33,7 @@ final class DispatcherRunnerLeaderElectionLifecycleManager<T extends DispatcherR
 	private DispatcherRunnerLeaderElectionLifecycleManager(T dispatcherRunner, LeaderElectionService leaderElectionService) throws Exception {
 		this.dispatcherRunner = dispatcherRunner;
 		this.leaderElectionService = leaderElectionService;
-
+		//启动lieader选举服务，此处不管是基于yarn提交还是standalone都是走StandaloneLeaderElectionService这个实现类
 		leaderElectionService.start(dispatcherRunner);
 	}
 

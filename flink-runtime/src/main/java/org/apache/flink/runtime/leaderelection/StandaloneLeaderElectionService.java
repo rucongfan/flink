@@ -45,6 +45,8 @@ public class StandaloneLeaderElectionService implements LeaderElectionService {
 		contender = Preconditions.checkNotNull(newContender);
 
 		// directly grant leadership to the given contender
+		// 如果是dispatcher则实际调用的是DefaultDispatcherRunner.grantLeadership{}
+		// 实际调用的是，此方法内根据不同的组件有不同的实现类
 		contender.grantLeadership(HighAvailabilityServices.DEFAULT_LEADER_ID);
 	}
 

@@ -192,26 +192,31 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 	@Override
 	public void onStart() throws Exception {
 		try {
+			// 启动dispatcher服务,但是里面只有注册dispatcher指标的代码，没找到启动dispatcher相关的代码
 			startDispatcherServices();
 		} catch (Exception e) {
 			final DispatcherException exception = new DispatcherException(String.format("Could not start the Dispatcher %s", getAddress()), e);
 			onFatalError(exception);
 			throw exception;
 		}
-
+		// 初始化作为一个参数提供的dispatcherBootstrap
+		// 实际进入了DefaultDispatcherBootstrap.initialize().launchRecoveredJobGraphs()在此方法里执行runRecoveredJob()
 		dispatcherBootstrap.initialize(this, this.getRpcService().getScheduledExecutor());
 	}
 
 	private void startDispatcherServices() throws Exception {
 		try {
+			// 注册Dispatcher相关的监控指标
 			registerDispatcherMetrics(jobManagerMetricGroup);
 		} catch (Exception e) {
 			handleStartDispatcherServicesException(e);
 		}
 	}
-
+	// 启动JobMaster
 	void runRecoveredJob(final JobGraph recoveredJob) {
 		checkNotNull(recoveredJob);
+		// 判断要执行的方法是否有执行异常如果有则调用FatalExitExceptionHandler
+		// 这里调用runJob()
 		FutureUtils.assertNoException(runJob(recoveredJob)
 			.handle(handleRecoveredJobStartError(recoveredJob.getJobID())));
 	}
@@ -362,11 +367,12 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 
 	private CompletableFuture<Void> runJob(JobGraph jobGraph) {
 		Preconditions.checkState(!jobManagerRunnerFutures.containsKey(jobGraph.getJobID()));
-
+		// 创建JobManager
+		// 在实例化JobManagerImpl的过程中还创建了JobMaster在为了JobManager组成的一部分
 		final CompletableFuture<JobManagerRunner> jobManagerRunnerFuture = createJobManagerRunner(jobGraph);
 
 		jobManagerRunnerFutures.put(jobGraph.getJobID(), jobManagerRunnerFuture);
-
+		// 在lambda表达式中调用了startJobManagerRunner方法
 		return jobManagerRunnerFuture
 			.thenApply(FunctionUtils.uncheckedFunction(this::startJobManagerRunner))
 			.thenApply(FunctionUtils.nullFn())
@@ -380,11 +386,13 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 	}
 
 	private CompletableFuture<JobManagerRunner> createJobManagerRunner(JobGraph jobGraph) {
+		// 创建rpc服务用于通信
 		final RpcService rpcService = getRpcService();
 
 		return CompletableFuture.supplyAsync(
 			() -> {
 				try {
+					// 通过工厂实例创建JobMaster(JobManager内部包括: Dispatcher、ResourceManager、JobMaster)其中JobMaster是通过Dispatcher创建的
 					return jobManagerRunnerFactory.createJobManagerRunner(
 						jobGraph,
 						configuration,
@@ -430,7 +438,8 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 
 					return null;
 				}, getMainThreadExecutor()));
-
+		// 这里实际调用了刚才实例化出来的JobManagerRunnerImpl的start方法
+		// 其内部又启动了leaderElectionService的start方法调用的standalone模式的leader选举模式只不过这次传入的不是dispatcher了
 		jobManagerRunner.start();
 
 		return jobManagerRunner;

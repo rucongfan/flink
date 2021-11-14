@@ -74,6 +74,7 @@ public final class ExitTrappingSecurityManager extends SecurityManager {
 	 * see https://issues.apache.org/jira/browse/FLINK-16510.
 	 *
 	 * @param configuration The Flink configuration
+	 * 如果配置了，则注册一个自定义的SecurityManager,这个组件可以优雅地将存在exit存在的调用转换成使用Runtime#Halt的强制退出
 	 */
 	public static void replaceGracefulExitWithHaltIfConfigured(Configuration configuration) {
 		if (configuration.get(HALT_ON_FATAL_ERROR)) {

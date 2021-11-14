@@ -117,7 +117,7 @@ public class JobManagerRunnerImpl implements LeaderContender, OnCompletionAction
 		this.classLoaderLease = checkNotNull(classLoaderLease);
 		this.executor = checkNotNull(executor);
 		this.fatalErrorHandler = checkNotNull(fatalErrorHandler);
-
+		// 对参数的校验和封装
 		checkArgument(jobGraph.getNumberOfVertices() > 0, "The given job is empty");
 
 		// libraries and class loader first
@@ -131,12 +131,14 @@ public class JobManagerRunnerImpl implements LeaderContender, OnCompletionAction
 		}
 
 		// high availability services next
+		// 设置了高可用相关服务
 		this.runningJobsRegistry = haServices.getRunningJobsRegistry();
 		this.leaderElectionService = haServices.getJobManagerLeaderElectionService(jobGraph.getJobID());
 
 		this.leaderGatewayFuture = new CompletableFuture<>();
 
 		// now start the JobManager
+		// 启动JobManager，这里的createJobMasterService实际返回的是JobMaster
 		this.jobMasterService = jobMasterFactory.createJobMasterService(jobGraph, this, userCodeLoader);
 	}
 
@@ -279,6 +281,7 @@ public class JobManagerRunnerImpl implements LeaderContender, OnCompletionAction
 			leadershipOperation = leadershipOperation.thenCompose(
 				(ignored) -> {
 					synchronized (lock) {
+						// 验证job的调度状态并启动JobManager
 						return verifyJobSchedulingStatusAndStartJobManager(leaderSessionID);
 					}
 				});
@@ -288,13 +291,16 @@ public class JobManagerRunnerImpl implements LeaderContender, OnCompletionAction
 	}
 
 	private CompletableFuture<Void> verifyJobSchedulingStatusAndStartJobManager(UUID leaderSessionId) {
+		// 获取job调度状态
 		final CompletableFuture<JobSchedulingStatus> jobSchedulingStatusFuture = getJobSchedulingStatus();
 
 		return jobSchedulingStatusFuture.thenCompose(
 			jobSchedulingStatus -> {
+				// 如果job的状态为done则说明job已经启动
 				if (jobSchedulingStatus == JobSchedulingStatus.DONE) {
 					return jobAlreadyDone();
 				} else {
+					// 如果job状态非done则启动jobMaster
 					return startJobMaster(leaderSessionId);
 				}
 			});
@@ -305,6 +311,7 @@ public class JobManagerRunnerImpl implements LeaderContender, OnCompletionAction
 			jobGraph.getName(), jobGraph.getJobID(), leaderSessionId, jobMasterService.getAddress());
 
 		try {
+			// 将job调度状态注册为running。在Yarn上跑的应该是写到zookeeper里了
 			runningJobsRegistry.setJobRunning(jobGraph.getJobID());
 		} catch (IOException e) {
 			return FutureUtils.completedExceptionally(
@@ -315,6 +322,7 @@ public class JobManagerRunnerImpl implements LeaderContender, OnCompletionAction
 
 		final CompletableFuture<Acknowledge> startFuture;
 		try {
+			// 启动JobMaster
 			startFuture = jobMasterService.start(new JobMasterId(leaderSessionId));
 		} catch (Exception e) {
 			return FutureUtils.completedExceptionally(new FlinkException("Failed to start the JobMaster.", e));

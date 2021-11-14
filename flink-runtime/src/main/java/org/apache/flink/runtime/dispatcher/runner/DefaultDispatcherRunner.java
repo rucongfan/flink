@@ -107,11 +107,15 @@ public final class DefaultDispatcherRunner implements DispatcherRunner, LeaderCo
 	}
 
 	private void startNewDispatcherLeaderProcess(UUID leaderSessionID) {
+		// 先停止dispatcher leader进程以防重复启动
 		stopDispatcherLeaderProcess();
-
+		// 创建新的Dispatcher leader进程
 		dispatcherLeaderProcess = createNewDispatcherLeaderProcess(leaderSessionID);
 
 		final DispatcherLeaderProcess newDispatcherLeaderProcess = dispatcherLeaderProcess;
+		// 执行 对象::调用对应的方法。
+		// 由于JobDispatcherLeaderProcess没有重写start方法则实际调用的是其父类AbstractDispatcherLeaderProcess.start方法
+		// 此方法内部先将app状态设置为running然后再调用子类的onStart方法.pre job模式则为JobDispatcherLeaderProcess.onStart方法
 		FutureUtils.assertNoException(
 			previousDispatcherLeaderProcessTerminationFuture.thenRun(newDispatcherLeaderProcess::start));
 	}

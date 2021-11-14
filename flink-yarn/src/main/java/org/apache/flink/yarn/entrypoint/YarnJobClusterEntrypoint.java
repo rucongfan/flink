@@ -36,6 +36,7 @@ import java.util.Map;
 
 /**
  * Entry point for Yarn per-job clusters.
+ * yarn pre-job模式入口类
  */
 public class YarnJobClusterEntrypoint extends JobClusterEntrypoint {
 
@@ -64,28 +65,35 @@ public class YarnJobClusterEntrypoint extends JobClusterEntrypoint {
 
 	public static void main(String[] args) {
 		// startup checks and logging
+		// 启动检查和日志，params：日志类，当前类名YarnJobClusterEntrypoint，参数
+		// 这里调用的和CliFronted.main打印环境信息是同一个类
 		EnvironmentInformation.logEnvironmentInfo(LOG, YarnJobClusterEntrypoint.class.getSimpleName(), args);
+		// 注册日志类
 		SignalHandler.register(LOG);
+		// 这里启动了一个线程用于控制JVM安全关闭。
 		JvmShutdownSafeguard.installAsShutdownHook(LOG);
 
 		Map<String, String> env = System.getenv();
-
+		// 获取key=pwd对应的工作目录
 		final String workingDirectory = env.get(ApplicationConstants.Environment.PWD.key());
+		// 检查工作目录
+		// params: 判断条件、错误信息、参数
 		Preconditions.checkArgument(
 			workingDirectory != null,
 			"Working directory variable (%s) not set",
 			ApplicationConstants.Environment.PWD.key());
 
 		try {
+			// 打印yarn的环境信息
 			YarnEntrypointUtils.logYarnEnvironmentInformation(env, LOG);
 		} catch (IOException e) {
 			LOG.warn("Could not log YARN environment information.", e);
 		}
-
+		// 加载配置
 		Configuration configuration = YarnEntrypointUtils.loadConfiguration(workingDirectory, env);
-
+		// 创建入口类
 		YarnJobClusterEntrypoint yarnJobClusterEntrypoint = new YarnJobClusterEntrypoint(configuration);
-
+		// 启动集群部署入口类
 		ClusterEntrypoint.runClusterEntrypoint(yarnJobClusterEntrypoint);
 	}
 }

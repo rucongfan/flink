@@ -30,6 +30,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /**
  * A {@link DispatcherBootstrap} which submits the provided {@link JobGraph job graphs}
  * for execution upon dispatcher initialization.
+ * DispatcherBootstrap用于在dispatcher初始化的时候执行提交提供的jobgraph
  */
 @Internal
 public class DefaultDispatcherBootstrap extends AbstractDispatcherBootstrap {

@@ -1039,21 +1039,26 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 		Runtime.getRuntime().addShutdownHook(deploymentFailureHook);
 		LOG.info("Submitting application master " + appId);
 		// 提交应用
+		// 通过之前传入的yarn入口类，pre job模式进入的是YarnJobClusterEntrypoint
 		yarnClient.submitApplication(appContext);
-
+		// 等待集群被分配
 		LOG.info("Waiting for the cluster to be allocated");
 		final long startTime = System.currentTimeMillis();
 		ApplicationReport report;
+		// 初始化application状态为NEW(刚创建)
 		YarnApplicationState lastAppState = YarnApplicationState.NEW;
 		loop: while (true) {
 			try {
+				// 循环不停地获取application报告
 				report = yarnClient.getApplicationReport(appId);
 			} catch (IOException e) {
 				throw new YarnDeploymentException("Failed to deploy the cluster.", e);
 			}
+			// 获取application state
 			YarnApplicationState appState = report.getYarnApplicationState();
 			LOG.debug("Application State: {}", appState);
 			switch(appState) {
+				// 状态为failed,kill抛异常
 				case FAILED:
 				case KILLED:
 					throw new YarnDeploymentException("The YARN application unexpectedly switched to state "
@@ -1069,19 +1074,24 @@ public class YarnClusterDescriptor implements ClusterDescriptor<ApplicationId> {
 					LOG.info("YARN application has been finished successfully.");
 					break loop;
 				default:
+					// 状态不为NEW
 					if (appState != lastAppState) {
 						LOG.info("Deploying cluster, current state " + appState);
 					}
+					// 如果部署集群耗时超过60s则打印日志提示查看资源是否不可用
 					if (System.currentTimeMillis() - startTime > 60000) {
 						LOG.info("Deployment took more than 60 seconds. Please check if the requested resources are available in the YARN cluster");
 					}
 
 			}
+			// 更新最近一次application的状态
 			lastAppState = appState;
+			// sleep 0.25秒
 			Thread.sleep(250);
 		}
 
 		// since deployment was successful, remove the hook
+		// 一旦部署成功，移除勾子线程(此线程是之前创建用于安装关闭jvm的线程)
 		ShutdownHookUtil.removeShutdownHook(deploymentFailureHook, getClass().getSimpleName(), LOG);
 		return report;
 	}
