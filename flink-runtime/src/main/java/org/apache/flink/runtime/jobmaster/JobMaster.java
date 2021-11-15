@@ -768,6 +768,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		startHeartbeatServices();
 
 		// start the slot pool make sure the slot pool now accepts messages for this leader
+		// 启动slotpool
 		slotPool.start(getFencingToken(), getAddress(), getMainThreadExecutor());
 		scheduler.start(getMainThreadExecutor());
 
@@ -779,6 +780,12 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		//   - activate leader retrieval for the resource manager
 		//   - on notification of the leader, the connection will be established and
 		//     the slot pool will start requesting slots
+		// job准备就绪，尝试与flink的resoure manager建立链接并激活resource manager的leader选举
+		// 在leader的通知下链接将会被建立，slotpool也开始请求slot资源
+		// todo:与Flink的ResourceManager建立链接,slotpool也开始请求slot资源
+
+		// 这里传入的是ResourceManager的监听器
+		// 此方法实际进入的是StandaloneLeaderRetrievalService.start()
 		resourceManagerLeaderRetriever.start(new ResourceManagerLeaderListener());
 	}
 
@@ -952,13 +959,15 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	private void notifyOfNewResourceManagerLeader(final String newResourceManagerAddress, final ResourceManagerId resourceManagerId) {
+		// 创建ResourceManager的地址
 		resourceManagerAddress = createResourceManagerAddress(newResourceManagerAddress, resourceManagerId);
-
+		// 重连ResourceManager
 		reconnectToResourceManager(new FlinkException(String.format("ResourceManager leader changed to new address %s", resourceManagerAddress)));
 	}
 
 	@Nullable
 	private ResourceManagerAddress createResourceManagerAddress(@Nullable String newResourceManagerAddress, @Nullable ResourceManagerId resourceManagerId) {
+		// 如果传入的新的ResourceManager的地址有效则重新实例化一个ResourceManager返回
 		if (newResourceManagerAddress != null) {
 			// the contract is: address == null <=> id == null
 			checkNotNull(resourceManagerId);
@@ -969,11 +978,14 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	private void reconnectToResourceManager(Exception cause) {
+		// 先关闭当前连接
 		closeResourceManagerConnection(cause);
+		// 重新建立连接
 		tryConnectToResourceManager();
 	}
 
 	private void tryConnectToResourceManager() {
+		// 地址有效则进行连接
 		if (resourceManagerAddress != null) {
 			connectToResourceManager();
 		}
@@ -985,7 +997,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		assert(establishedResourceManagerConnection == null);
 
 		log.info("Connecting to ResourceManager {}", resourceManagerAddress);
-
+		// 实例化了一个ResourceManager连接
 		resourceManagerConnection = new ResourceManagerConnection(
 			log,
 			jobGraph.getJobID(),
@@ -995,7 +1007,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			resourceManagerAddress.getAddress(),
 			resourceManagerAddress.getResourceManagerId(),
 			scheduledExecutorService);
-
+		// 启动连接
 		resourceManagerConnection.start();
 	}
 
@@ -1007,15 +1019,16 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 				&& Objects.equals(resourceManagerConnection.getTargetLeaderId(), resourceManagerId)) {
 
 			log.info("JobManager successfully registered at ResourceManager, leader id: {}.", resourceManagerId);
-
+			// 获取target的网关
 			final ResourceManagerGateway resourceManagerGateway = resourceManagerConnection.getTargetGateway();
 
 			final ResourceID resourceManagerResourceId = success.getResourceManagerResourceId();
-
+			// 建立连接对象
 			establishedResourceManagerConnection = new EstablishedResourceManagerConnection(
 				resourceManagerGateway,
 				resourceManagerResourceId);
-
+			// JobMaster连接resourceManager
+			// 实际上是slotpool连接到ResourceManager，请求资源
 			slotPool.connectToResourceManager(resourceManagerGateway);
 
 			resourceManagerHeartbeatManager.monitorTarget(resourceManagerResourceId, new HeartbeatTarget<Void>() {
@@ -1121,6 +1134,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			this.jobMasterId = checkNotNull(jobMasterId);
 		}
 
+		// 生成JobMaster与ResourceManager的注册连接对象
 		@Override
 		protected RetryingRegistration<ResourceManagerId, ResourceManagerGateway, JobMasterRegistrationSuccess> generateRegistration() {
 			return new RetryingRegistration<ResourceManagerId, ResourceManagerGateway, JobMasterRegistrationSuccess>(
@@ -1153,6 +1167,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 				// filter out outdated connections
 				//noinspection ObjectEquality
 				if (this == resourceManagerConnection) {
+					// 建立ResourceManager连接
 					establishResourceManagerConnection(success);
 				}
 			});

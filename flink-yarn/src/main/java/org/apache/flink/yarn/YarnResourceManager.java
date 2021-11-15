@@ -340,6 +340,7 @@ public class YarnResourceManager extends ActiveResourceManager<YarnWorkerNode>
 
 	@Override
 	public boolean startNewWorker(WorkerResourceSpec workerResourceSpec) {
+		// 请求yarn的container
 		return requestYarnContainer(workerResourceSpec);
 	}
 
@@ -629,12 +630,13 @@ public class YarnResourceManager extends ActiveResourceManager<YarnWorkerNode>
 	}
 
 	private boolean requestYarnContainer(WorkerResourceSpec workerResourceSpec) {
+		// 获取yarn container资源
 		Optional<Resource> containerResourceOptional = getContainerResource(workerResourceSpec);
 
 		if (containerResourceOptional.isPresent()) {
 			resourceManagerClient.addContainerRequest(getContainerRequest(containerResourceOptional.get()));
-
 			// make sure we transmit the request fast and receive fast news of granted allocations
+			// 设置心跳间隔
 			resourceManagerClient.setHeartbeatInterval(containerRequestHeartbeatIntervalMillis);
 			int numPendingWorkers = notifyNewWorkerRequested(workerResourceSpec).getNumNotAllocated();
 

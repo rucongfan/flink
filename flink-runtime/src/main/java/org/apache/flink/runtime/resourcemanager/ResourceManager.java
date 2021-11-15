@@ -458,6 +458,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 					slotRequest.getAllocationId());
 
 				try {
+					// ResourceManager中的slotManager向yarn的ResourceManager申请资源
 					slotManager.registerSlotRequest(slotRequest);
 				} catch (ResourceManagerException e) {
 					return FutureUtils.completedExceptionally(e);
@@ -1154,7 +1155,9 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 
 		@Override
 		public boolean allocateResource(WorkerResourceSpec workerResourceSpec) {
+			// 验证是否在主进程
 			validateRunsInMainThread();
+			// 启动新的worker
 			return startNewWorker(workerResourceSpec);
 		}
 

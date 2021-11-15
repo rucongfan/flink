@@ -383,6 +383,7 @@ public class SlotManagerImpl implements SlotManager {
 			pendingSlotRequests.put(slotRequest.getAllocationId(), pendingSlotRequest);
 
 			try {
+				// 请求slot
 				internalRequestSlot(pendingSlotRequest);
 			} catch (ResourceManagerException e) {
 				// requesting the slot failed --> remove pending slot request
@@ -862,7 +863,7 @@ public class SlotManagerImpl implements SlotManager {
 
 		OptionalConsumer.of(findMatchingSlot(resourceProfile))
 			.ifPresent(taskManagerSlot -> allocateSlot(taskManagerSlot, pendingSlotRequest))
-			.ifNotPresent(() -> fulfillPendingSlotRequestWithPendingTaskManagerSlot(pendingSlotRequest));
+			.ifNotPresent(() -> fulfillPendingSlotRequestWithPendingTaskManagerSlot(pendingSlotRequest));	// 如果slot不存在则重新申请，pre job模式走此方法
 	}
 
 	private void fulfillPendingSlotRequestWithPendingTaskManagerSlot(PendingSlotRequest pendingSlotRequest) throws ResourceManagerException {
@@ -870,6 +871,7 @@ public class SlotManagerImpl implements SlotManager {
 		Optional<PendingTaskManagerSlot> pendingTaskManagerSlotOptional = findFreeMatchingPendingTaskManagerSlot(resourceProfile);
 
 		if (!pendingTaskManagerSlotOptional.isPresent()) {
+			// 如果不存在空闲的slot则分配资源
 			pendingTaskManagerSlotOptional = allocateResource(resourceProfile);
 		}
 
@@ -915,7 +917,9 @@ public class SlotManagerImpl implements SlotManager {
 	}
 
 	private Optional<PendingTaskManagerSlot> allocateResource(ResourceProfile requestedSlotResourceProfile) {
+		// 获取已经注册过的slot数
 		final int numRegisteredSlots =  getNumberRegisteredSlots();
+		// 获取就绪的slot数
 		final int numPendingSlots = getNumberPendingTaskManagerSlots();
 		if (isMaxSlotNumExceededAfterAdding(numSlotsPerWorker)) {
 			LOG.warn("Could not allocate {} more slots. The number of registered and pending slots is {}, while the maximum is {}.",
@@ -927,7 +931,7 @@ public class SlotManagerImpl implements SlotManager {
 			// requested resource profile is unfulfillable
 			return Optional.empty();
 		}
-
+		// 分配资源
 		if (!resourceActions.allocateResource(defaultWorkerResourceSpec)) {
 			// resource cannot be allocated
 			return Optional.empty();

@@ -87,12 +87,14 @@ public abstract class RegisteredRpcConnection<F extends Serializable, G extends 
 	// ------------------------------------------------------------------------
 
 	public void start() {
+		// 校验状态
 		checkState(!closed, "The RPC connection is already closed");
 		checkState(!isConnected() && pendingRegistration == null, "The RPC connection is already started");
-
+		// 创建新的注册(jobMaster像ResourceManager注册)
 		final RetryingRegistration<F, G, S> newRegistration = createNewRegistration();
 
 		if (REGISTRATION_UPDATER.compareAndSet(this, null, newRegistration)) {
+			// 开启注册
 			newRegistration.startRegistration();
 		} else {
 			// concurrent start operation
@@ -222,6 +224,7 @@ public abstract class RegisteredRpcConnection<F extends Serializable, G extends 
 	// ------------------------------------------------------------------------
 
 	private RetryingRegistration<F, G, S> createNewRegistration() {
+		// 生成注册
 		RetryingRegistration<F, G, S> newRegistration = checkNotNull(generateRegistration());
 
 		CompletableFuture<Tuple2<G, S>> future = newRegistration.getFuture();

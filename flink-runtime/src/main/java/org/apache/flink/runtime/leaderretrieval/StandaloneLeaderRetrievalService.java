@@ -75,13 +75,17 @@ public class StandaloneLeaderRetrievalService implements LeaderRetrievalService 
 
 	@Override
 	public void start(LeaderRetrievalListener listener) {
+		// 校验监听器是否为null
 		checkNotNull(listener, "Listener must not be null.");
 
 		synchronized (startStopLock) {
+			// 判断服务是否已经启动
 			checkState(!started, "StandaloneLeaderRetrievalService can only be started once.");
 			started = true;
 
 			// directly notify the listener, because we already know the leading JobManager's address
+			// 直接通知监听器，因为我们已经知道了JobManager的地址
+			// 此方法最终进入了ResourceManagerLeaderListener in JobMaster
 			listener.notifyLeaderAddress(leaderAddress, leaderId);
 		}
 	}

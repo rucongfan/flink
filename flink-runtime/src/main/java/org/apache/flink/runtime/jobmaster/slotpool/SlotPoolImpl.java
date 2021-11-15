@@ -273,10 +273,12 @@ public class SlotPoolImpl implements SlotPool {
 
 	@Override
 	public void connectToResourceManager(@Nonnull ResourceManagerGateway resourceManagerGateway) {
+		// 检验ResourceManager地址
 		this.resourceManagerGateway = checkNotNull(resourceManagerGateway);
 
 		// work on all slots waiting for this connection
 		for (PendingRequest pendingRequest : waitingForResourceManager.values()) {
+			// 向resourceManager请求slot
 			requestSlotFromResourceManager(resourceManagerGateway, pendingRequest);
 		}
 
@@ -333,7 +335,7 @@ public class SlotPoolImpl implements SlotPool {
 					resourceManagerGateway.cancelSlotRequest(allocationId);
 				}
 			});
-
+		// 请求slot
 		CompletableFuture<Acknowledge> rmResponse = resourceManagerGateway.requestSlot(
 			jobMasterId,
 			new SlotRequest(jobId, allocationId, pendingRequest.getResourceProfile(), jobManagerAddress),
