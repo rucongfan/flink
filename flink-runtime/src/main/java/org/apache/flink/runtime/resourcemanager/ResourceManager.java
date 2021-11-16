@@ -408,6 +408,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 		final WorkerRegistration<WorkerType> workerTypeWorkerRegistration = taskExecutors.get(taskManagerResourceId);
 
 		if (workerTypeWorkerRegistration.getInstanceID().equals(taskManagerRegistrationId)) {
+			// 通过slotManager注册taskManager
 			if (slotManager.registerTaskManager(workerTypeWorkerRegistration, slotReport)) {
 				onTaskManagerRegistration(workerTypeWorkerRegistration);
 			}

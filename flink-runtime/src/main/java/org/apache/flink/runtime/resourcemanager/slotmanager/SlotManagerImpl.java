@@ -385,6 +385,7 @@ public class SlotManagerImpl implements SlotManager {
 			try {
 				// 请求slot
 				internalRequestSlot(pendingSlotRequest);
+				// 申请完container就开始启动taskManager，yarn模式实际的入口是YarnTaskExecutorRunner，standalone模式实际的入口是TaskManagerRunner
 			} catch (ResourceManagerException e) {
 				// requesting the slot failed --> remove pending slot request
 				pendingSlotRequests.remove(slotRequest.getAllocationId());
@@ -437,10 +438,12 @@ public class SlotManagerImpl implements SlotManager {
 		LOG.debug("Registering TaskManager {} under {} at the SlotManager.", taskExecutorConnection.getResourceID(), taskExecutorConnection.getInstanceID());
 
 		// we identify task managers by their instance id
+		// 验证是否已经注册
 		if (taskManagerRegistrations.containsKey(taskExecutorConnection.getInstanceID())) {
 			reportSlotStatus(taskExecutorConnection.getInstanceID(), initialSlotReport);
 			return false;
 		} else {
+			// 是否注册后超出最大slot数
 			if (isMaxSlotNumExceededAfterRegistration(initialSlotReport)) {
 				LOG.info("The total number of slots exceeds the max limitation {}, release the excess resource.", maxSlotNum);
 				resourceActions.releaseResource(taskExecutorConnection.getInstanceID(), new FlinkException("The total number of slots exceeds the max limitation."));
@@ -462,6 +465,7 @@ public class SlotManagerImpl implements SlotManager {
 
 			// next register the new slots
 			for (SlotStatus slotStatus : initialSlotReport) {
+				// 然后注册一个新的slot
 				registerSlot(
 					slotStatus.getSlotID(),
 					slotStatus.getAllocationID(),

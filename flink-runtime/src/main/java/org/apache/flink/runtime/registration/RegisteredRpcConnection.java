@@ -225,6 +225,8 @@ public abstract class RegisteredRpcConnection<F extends Serializable, G extends 
 
 	private RetryingRegistration<F, G, S> createNewRegistration() {
 		// 生成注册
+		// 如果是jobMaster重连ResourceManager则最终进入了 ResourceManagerConnection in JobMaster
+		// 如果是taskExecutor重连ResourceManager则最终进入了TaskExecutorToResourceManagerConnection
 		RetryingRegistration<F, G, S> newRegistration = checkNotNull(generateRegistration());
 
 		CompletableFuture<Tuple2<G, S>> future = newRegistration.getFuture();

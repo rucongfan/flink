@@ -70,6 +70,7 @@ public class TaskExecutorToResourceManagerConnection
 
 	@Override
 	protected RetryingRegistration<ResourceManagerId, ResourceManagerGateway, TaskExecutorRegistrationSuccess> generateRegistration() {
+		// 实例化一个taskExecutor与ResourceManager的连接并进行注册
 		return new TaskExecutorToResourceManagerConnection.ResourceManagerRegistration(
 			log,
 			rpcService,
@@ -120,6 +121,7 @@ public class TaskExecutorToResourceManagerConnection
 				ResourceManagerGateway resourceManager, ResourceManagerId fencingToken, long timeoutMillis) throws Exception {
 
 			Time timeout = Time.milliseconds(timeoutMillis);
+			// 通过resourceManager注册taskExecutor
 			return resourceManager.registerTaskExecutor(
 				taskExecutorRegistration,
 				timeout);

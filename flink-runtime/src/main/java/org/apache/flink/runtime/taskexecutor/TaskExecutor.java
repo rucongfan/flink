@@ -355,6 +355,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 	@Override
 	public void onStart() throws Exception {
 		try {
+			// 启动taskExecutor服务
 			startTaskExecutorServices();
 		} catch (Exception e) {
 			final TaskManagerException exception = new TaskManagerException(String.format("Could not start the TaskExecutor %s", getAddress()), e);
@@ -368,6 +369,8 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 	private void startTaskExecutorServices() throws Exception {
 		try {
 			// start by connecting to the ResourceManager
+			// 连接到ResourceManager，传入的是ResourceManager leader的监听器
+			// 最终进入了TaskExecutor.ResourceManagerLeaderListener.notifyOfNewResourceManagerLeader()方法
 			resourceManagerLeaderRetriever.start(new ResourceManagerLeaderListener());
 
 			// tell the task slot table who's responsible for the task slot actions
@@ -1089,7 +1092,9 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 	// ------------------------------------------------------------------------
 
 	private void notifyOfNewResourceManagerLeader(String newLeaderAddress, ResourceManagerId newResourceManagerId) {
+		// 创建ResourceManager地址
 		resourceManagerAddress = createResourceManagerAddress(newLeaderAddress, newResourceManagerId);
+		// 重连ResourceManager
 		reconnectToResourceManager(new FlinkException(String.format("ResourceManager leader changed to new address %s", resourceManagerAddress)));
 	}
 
@@ -1104,8 +1109,11 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 	}
 
 	private void reconnectToResourceManager(Exception cause) {
+		// 关闭当前连接
 		closeResourceManagerConnection(cause);
+		// 开始注册
 		startRegistrationTimeout();
+		// 重连ResourceManager
 		tryConnectToResourceManager();
 	}
 
@@ -1141,6 +1149,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 				getMainThreadExecutor(),
 				new ResourceManagerRegistrationListener(),
 				taskExecutorRegistration);
+		// 启动ResourceManager连接
 		resourceManagerConnection.start();
 	}
 
@@ -1149,7 +1158,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 			ResourceID resourceManagerResourceId,
 			InstanceID taskExecutorRegistrationId,
 			ClusterInformation clusterInformation) {
-
+		// 发送slot相关信息
 		final CompletableFuture<Acknowledge> slotReportResponseFuture = resourceManagerGateway.sendSlotReport(
 			getResourceID(),
 			taskExecutorRegistrationId,
@@ -1875,6 +1884,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 					//noinspection ObjectEquality
 					if (resourceManagerConnection == connection) {
 						try {
+							// 建立与ResourceManager的连接
 							establishResourceManagerConnection(
 								resourceManagerGateway,
 								resourceManagerId,

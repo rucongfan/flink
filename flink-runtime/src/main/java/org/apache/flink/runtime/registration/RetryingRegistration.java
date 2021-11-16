@@ -202,6 +202,7 @@ public abstract class RetryingRegistration<F extends Serializable, G extends Rpc
 
 		try {
 			log.debug("Registration at {} attempt {} (timeout={}ms)", targetName, attempt, timeoutMillis);
+			// 调用对应invokeRegistration()方法，比如taskExecutor连接ResourceManager就是调用TaskExecutorToResourceManagerConnection.invokeRegistration
 			CompletableFuture<RegistrationResponse> registrationFuture = invokeRegistration(gateway, fencingToken, timeoutMillis);
 
 			// if the registration was successful, let the TaskExecutor know
@@ -272,6 +273,7 @@ public abstract class RetryingRegistration<F extends Serializable, G extends Rpc
 	}
 
 	private void startRegistrationLater(final long delay) {
+		// 通过rpc调用对方的startRegistration方法
 		rpcService.scheduleRunnable(
 			this::startRegistration,
 			delay,

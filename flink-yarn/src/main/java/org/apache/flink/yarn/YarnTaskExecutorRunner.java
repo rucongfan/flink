@@ -43,6 +43,7 @@ import java.util.Map;
 
 /**
  * This class is the executable entry point for running a TaskExecutor in a YARN container.
+ * 这个类是运行可执行TaskExecutor在Yarn container里的入口类
  */
 public class YarnTaskExecutorRunner {
 
@@ -60,14 +61,14 @@ public class YarnTaskExecutorRunner {
 
 	/**
 	 * The entry point for the YARN task executor runner.
-	 *
+	 * Yarn task executor入口
 	 * @param args The command line arguments.
 	 */
 	public static void main(String[] args) {
 		EnvironmentInformation.logEnvironmentInfo(LOG, "YARN TaskExecutor runner", args);
 		SignalHandler.register(LOG);
 		JvmShutdownSafeguard.installAsShutdownHook(LOG);
-
+		// 安全地启动task manager
 		runTaskManagerSecurely(args);
 	}
 
@@ -81,17 +82,17 @@ public class YarnTaskExecutorRunner {
 	private static void runTaskManagerSecurely(String[] args) {
 		try {
 			LOG.debug("All environment variables: {}", ENV);
-
+			// 当前路径
 			final String currDir = ENV.get(Environment.PWD.key());
 			LOG.info("Current working Directory: {}", currDir);
-
+			// 加载配置到taskManagerRunner
 			final Configuration configuration = TaskManagerRunner.loadConfiguration(args);
 			setupAndModifyConfiguration(configuration, currDir, ENV);
-
+			// 获取containerId并校验
 			final String containerId = ENV.get(YarnResourceManager.ENV_FLINK_CONTAINER_ID);
 			Preconditions.checkArgument(containerId != null,
 				"ContainerId variable %s not set", YarnResourceManager.ENV_FLINK_CONTAINER_ID);
-
+			// 安全地启动task，最终还是进入的TaskManagerRunner，只不过多了一些参数的封装
 			TaskManagerRunner.runTaskManagerSecurely(configuration, new ResourceID(containerId));
 		}
 		catch (Throwable t) {

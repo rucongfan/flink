@@ -84,6 +84,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * This class is the executable entry point for the task manager in yarn or standalone mode.
  * It constructs the related components (network, I/O manager, memory manager, RPC service, HA service)
  * and starts them.
+ * 这个类是standalone模式的taskmanager的入口点
  */
 public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync {
 
@@ -178,6 +179,7 @@ public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync 
 	// --------------------------------------------------------------------------------------------
 
 	public void start() throws Exception {
+		// taskManager是TaskExecutor的实例
 		taskManager.start();
 	}
 
@@ -303,8 +305,9 @@ public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync 
 	}
 
 	public static void runTaskManager(Configuration configuration, ResourceID resourceId, PluginManager pluginManager) throws Exception {
+		// 新建一个taskManagerRunner
 		final TaskManagerRunner taskManagerRunner = new TaskManagerRunner(configuration, resourceId, pluginManager);
-
+		// 启动，这里是通过rpc调用。最终进入TaskExecutor.onStart()方法
 		taskManagerRunner.start();
 	}
 
@@ -320,12 +323,15 @@ public class TaskManagerRunner implements FatalErrorHandler, AutoCloseableAsync 
 	}
 
 	public static void runTaskManagerSecurely(Configuration configuration, ResourceID resourceID) throws Exception {
+		// 替换配置项
 		replaceGracefulExitWithHaltIfConfigured(configuration);
+		// 创建一个pluginManager
 		final PluginManager pluginManager = PluginUtils.createPluginManagerFromRootFolder(configuration);
+		// 初始化文件系统
 		FileSystem.initialize(configuration, pluginManager);
-
+		// 安装安全相关的配置信息(安全认证类)
 		SecurityUtils.install(new SecurityConfiguration(configuration));
-
+		// 启动taskManager
 		SecurityUtils.getInstalledContext().runSecured(() -> {
 			runTaskManager(configuration, resourceID, pluginManager);
 			return null;
