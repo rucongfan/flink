@@ -666,6 +666,7 @@ public class SlotManagerImpl implements SlotManager {
 
 		if (slots.containsKey(slotId)) {
 			// remove the old slot first
+			// 移除旧的slot
 			removeSlot(
 				slotId,
 				new SlotManagerException(
@@ -673,7 +674,7 @@ public class SlotManagerImpl implements SlotManager {
 						"Re-registration of slot %s. This indicates that the TaskExecutor has re-connected.",
 						slotId)));
 		}
-
+		// 创建并注册新的TaskManagerSlot
 		final TaskManagerSlot slot = createAndRegisterTaskManagerSlot(slotId, resourceProfile, taskManagerConnection);
 
 		final PendingTaskManagerSlot pendingTaskManagerSlot;
@@ -683,17 +684,22 @@ public class SlotManagerImpl implements SlotManager {
 		} else {
 			pendingTaskManagerSlot = null;
 		}
-
+		// 如果没有待分配的slot
 		if (pendingTaskManagerSlot == null) {
 			updateSlot(slotId, allocationId, jobId);
 		} else {
+			// 取出一个slot
 			pendingSlots.remove(pendingTaskManagerSlot.getTaskManagerSlotId());
+			// 取出一个分配请求
 			final PendingSlotRequest assignedPendingSlotRequest = pendingTaskManagerSlot.getAssignedPendingSlotRequest();
-
+			// 如果没有待分配的请求
 			if (assignedPendingSlotRequest == null) {
+				// 表示请求都已经处理完，
 				handleFreeSlot(slot);
 			} else {
+				// 表示需要处理请求，进行slot分配
 				assignedPendingSlotRequest.unassignPendingTaskManagerSlot();
+				// 分配slot
 				allocateSlot(slot, assignedPendingSlotRequest);
 			}
 		}
@@ -964,16 +970,18 @@ public class SlotManagerImpl implements SlotManager {
 	 * @param pendingSlotRequest to allocate the given slot for
 	 */
 	private void allocateSlot(TaskManagerSlot taskManagerSlot, PendingSlotRequest pendingSlotRequest) {
+		// 检查该slot的状态是为空闲的
 		Preconditions.checkState(taskManagerSlot.getState() == TaskManagerSlot.State.FREE);
-
+		// 获取与taskManager的连接
 		TaskExecutorConnection taskExecutorConnection = taskManagerSlot.getTaskManagerConnection();
+		// 获取taskExecutorGateway
 		TaskExecutorGateway gateway = taskExecutorConnection.getTaskExecutorGateway();
 
 		final CompletableFuture<Acknowledge> completableFuture = new CompletableFuture<>();
 		final AllocationID allocationId = pendingSlotRequest.getAllocationId();
 		final SlotID slotId = taskManagerSlot.getSlotId();
 		final InstanceID instanceID = taskManagerSlot.getInstanceId();
-
+		// 将该slot的状态置为pending
 		taskManagerSlot.assignPendingSlotRequest(pendingSlotRequest);
 		pendingSlotRequest.setRequestFuture(completableFuture);
 
